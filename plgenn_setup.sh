@@ -24,9 +24,9 @@ REPORT = {}
 # ================= OWASP MAP =================
 OWASP = {
     "SQL Injection": ("A03:2021", "Injection flaws allow manipulation of SQL queries."),
-    "XSS": ("A03:2021", "Cross-Site Scripting executes attacker JS in browser."),
+    "XSS": ("A03:2021", "Cross-Site Scripting executes attacker JavaScript in the browser."),
     "Command Injection": ("A03:2021", "OS commands executed via unsanitized input."),
-    "Path Traversal / LFI": ("A01:2021", "Allows reading arbitrary server files.")
+    "Path Traversal / LFI": ("A01:2021", "Allows attackers to read arbitrary server files.")
 }
 
 # ================= DATABASE =================
@@ -36,37 +36,114 @@ c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")
 c.execute("INSERT OR IGNORE INTO users VALUES (1,'admin')")
 db.commit()
 
-# ================= UI =================
+# ================= UI (POLISHED) =================
 HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>PlGenN Vulnerability Lab</title>
+<title>PlGenN Vulnerability Verification Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{font-family:Arial;background:#0d1117;color:#e6edf3;padding:30px}
-textarea{width:100%;height:120px;font-size:16px}
-button{padding:10px 18px;font-size:15px;margin-top:10px}
-.box{background:#161b22;padding:20px;border-radius:10px}
-.bad{color:#f85149;font-weight:bold}
-.good{color:#3fb950;font-weight:bold}
-small{color:#8b949e}
+body{
+    font-family: "Segoe UI", Arial, sans-serif;
+    background:#0d1117;
+    color:#e6edf3;
+    padding:20px;
+}
+.container{
+    max-width:700px;
+    margin:auto;
+}
+.header{
+    margin-bottom:25px;
+}
+.header h2{
+    margin:0;
+}
+.header p{
+    color:#8b949e;
+    font-size:14px;
+}
+.card{
+    background:#161b22;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 0 0 1px #30363d;
+}
+textarea{
+    width:100%;
+    height:120px;
+    background:#0d1117;
+    color:#e6edf3;
+    border:1px solid #30363d;
+    border-radius:8px;
+    padding:10px;
+    font-size:15px;
+}
+textarea:focus{
+    outline:none;
+    border-color:#58a6ff;
+}
+button{
+    margin-top:15px;
+    padding:12px 20px;
+    font-size:15px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#238636;
+    color:#fff;
+}
+button:hover{
+    background:#2ea043;
+}
+.link{
+    display:inline-block;
+    margin-top:15px;
+    color:#58a6ff;
+    text-decoration:none;
+}
+.result-good{
+    color:#3fb950;
+    font-weight:bold;
+}
+.result-bad{
+    color:#f85149;
+    font-weight:bold;
+}
+.footer{
+    margin-top:20px;
+    font-size:13px;
+    color:#8b949e;
+}
 </style>
 </head>
+
 <body>
+<div class="container">
 
-<h2>🧪 PlGenN Local Vulnerability Verification</h2>
-
-<div class="box">
-<form method="POST" action="/verify">
-<textarea name="payload" required placeholder="Paste payload here"></textarea><br>
-<button type="submit">Test Payload</button>
-</form>
-<br>
-<a href="/report">⬇ Download PDF Report</a>
+<div class="header">
+<h2>🧪 PlGenN Payload Verification Lab</h2>
+<p>Local vulnerable environment for academic payload validation (DVWA-like)</p>
 </div>
 
-<br><small>✔ Real execution proof • ✔ OWASP mapped • ✔ Research ready</small>
+<div class="card">
+<form method="POST" action="/verify">
+<label><b>Paste Generated Payload</b></label><br><br>
+<textarea name="payload" placeholder="e.g. <script>alert(1)</script>" required></textarea>
+<button type="submit">Test Payload</button>
+</form>
 
+<a class="link" href="/report">⬇ Download Verification PDF Report</a>
+</div>
+
+<div class="footer">
+✔ Real execution proof &nbsp; | &nbsp;
+✔ OWASP Top 10 mapped &nbsp; | &nbsp;
+✔ Research & academic use
+</div>
+
+</div>
 </body>
 </html>
 """
@@ -124,7 +201,7 @@ def verify():
         REPORT = build_report(payload, category, result, proof)
 
         return f"""
-        <h3 class='bad'>VULNERABILITY TRIGGERED</h3>
+        <h2 class='result-bad'>VULNERABILITY TRIGGERED</h2>
         <p><b>Category:</b> XSS</p>
         <p><b>Proof:</b> Script executed below</p>
         <hr>{payload}<hr>
@@ -134,7 +211,7 @@ def verify():
     REPORT = build_report(payload, category, result, proof)
 
     return f"""
-    <h3 class='{'bad' if result=='VULNERABILITY TRIGGERED' else 'good'}'>{result}</h3>
+    <h2 class='{'result-bad' if result=='VULNERABILITY TRIGGERED' else 'result-good'}'>{result}</h2>
     <p><b>Category:</b> {category}</p>
     <p><b>Proof:</b> {proof}</p>
     <a href="/">⬅ Back</a>
@@ -154,7 +231,7 @@ def build_report(payload, category, result, proof):
         "Model": "PlGenN Hybrid (Rule + GNN)"
     }
 
-# ================= PDF (FIXED & SAFE) =================
+# ================= PDF =================
 @app.route("/report")
 def report():
     if not REPORT:
@@ -186,6 +263,7 @@ def report():
 if __name__ == "__main__":
     print("🌐 Open http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000)
+ 
 EOF
 
 echo "✅ Setup complete"

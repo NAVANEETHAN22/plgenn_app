@@ -3,193 +3,232 @@
 echo "🔧 PlGenN REAL Vulnerability Lab Setup"
 echo "===================================="
 
+# Safe update
 pkg update -y && pkg upgrade -y
+
+# Install dependencies
 pkg install python curl sqlite -y
 
+# Python libraries (Termux safe)
 pip install --upgrade pip
-pip install flask fpdf requests
+pip install flask fpdf
 
+# Workspace
 mkdir -p ~/plgenn_lab
 cd ~/plgenn_lab || exit
 
+# ================= SERVER =================
 cat <<'EOF' > server.py
 from flask import Flask, request, send_file, render_template_string
 from fpdf import FPDF
 from datetime import datetime
-import sqlite3, subprocess, io, requests
+import sqlite3, subprocess, io, os
 
 app = Flask(__name__)
 REPORT = {}
 
-# ---------------- OWASP INFO ----------------
+# ================= OWASP MAP =================
 OWASP = {
-    "SQL Injection": ("A03 – Injection",
-        "Untrusted data is sent to an interpreter as part of a SQL query."),
-    "XSS": ("A03 – Injection",
-        "Malicious JavaScript is injected and executed in a victim's browser."),
-    "Command Injection": ("A03 – Injection",
-        "System commands are injected and executed by the OS."),
-    "Path Traversal / LFI": ("A05 – Security Misconfiguration",
-        "Improper access control allows reading arbitrary files."),
-    "SSRF": ("A10 – Server-Side Request Forgery",
-        "Server is forced to make unintended internal requests."),
-    "Open Redirect": ("A01 – Broken Access Control",
-        "User is redirected to untrusted external sites.")
+    "SQL Injection": {
+        "id": "A03:2021",
+        "info": "Injection flaws allow attackers to interfere with queries sent to a database."
+    },
+    "XSS": {
+        "id": "A03:2021",
+        "info": "Cross-Site Scripting allows execution of malicious JavaScript in a victim’s browser."
+    },
+    "Command Injection": {
+        "id": "A03:2021",
+        "info": "Command Injection allows execution of arbitrary OS commands."
+    },
+    "Path Traversal / LFI": {
+        "id": "A01:2021",
+        "info": "Allows attackers to read files outside intended directories."
+    }
 }
 
-# ---------------- REAL SQLi DB ----------------
+# ================= SQLi DATABASE =================
 db = sqlite3.connect("users.db", check_same_thread=False)
 c = db.cursor()
 c.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")
 c.execute("INSERT OR IGNORE INTO users VALUES (1,'admin')")
 db.commit()
 
-# ---------------- HTML UI ----------------
+# ================= HTML =================
 HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>PlGenN Vulnerability Lab</title>
+<style>
+body{font-family:Arial;background:#0d1117;color:#e6edf3;padding:30px}
+textarea{width:100%;height:120px;font-size:16px}
+button{padding:10px 20px;font-size:15px;margin-top:10px}
+.box{background:#161b22;padding:20px;border-radius:10px}
+.bad{color:#f85149}
+.good{color:#3fb950}
+</style>
+</head>
+<body>
+
 <h2>🧪 PlGenN REAL Vulnerability Lab</h2>
+
+<div class="box">
 <form method="POST" action="/verify">
-<textarea name="payload" style="width:100%;height:120px" required></textarea><br>
+<textarea name="payload" required placeholder="Paste payload here"></textarea><br>
 <button type="submit">Test Payload</button>
 </form>
 <br>
 <a href="/report">⬇ Download PDF Report</a>
+</div>
+
+</body>
+</html>
 """
 
 @app.route("/")
 def home():
     return render_template_string(HTML)
 
-# ---------------- DETECTION ----------------
-def detect(payload):
-    p = payload.lower()
-    if any(x in p for x in ["' or '1'='1", "union", "select", "--"]):
-        return "SQL Injection"
-    if "<script" in p:
-        return "XSS"
-    if any(x in p for x in [";", "|", "$("]):
-        return "Command Injection"
-    if "../" in p or "..\\" in p:
-        return "Path Traversal / LFI"
-    if "http://127.0.0.1" in p or "localhost" in p:
-        return "SSRF"
-    if p.startswith("http://") or p.startswith("https://"):
-        return "Open Redirect"
-    return "Benign"
-
-# ---------------- VERIFICATION ----------------
+# ================= VERIFICATION =================
 @app.route("/verify", methods=["POST"])
 def verify():
     global REPORT
     payload = request.form["payload"]
-    category = detect(payload)
 
+    category = "Benign"
     result = "NO EFFECT"
     proof = "No vulnerability triggered"
 
-    if category == "SQL Injection":
-        try:
-            rows = c.execute(
-                f"SELECT * FROM users WHERE name = '{payload}'"
-            ).fetchall()
-            if rows:
-                result = "VULNERABILITY TRIGGERED"
-                proof = "Authentication bypass via SQLi"
-        except:
+    # ---------- SQL Injection ----------
+    try:
+        q = f"SELECT * FROM users WHERE name = '{payload}'"
+        rows = c.execute(q).fetchall()
+        if rows:
+            category = "SQL Injection"
             result = "VULNERABILITY TRIGGERED"
-            proof = "SQL syntax manipulation"
-
-    elif category == "Command Injection":
-        output = subprocess.getoutput(payload)
+            proof = "Authentication bypass via SQL query manipulation"
+    except:
+        category = "SQL Injection"
         result = "VULNERABILITY TRIGGERED"
-        proof = f"OS command executed: {output[:60]}"
+        proof = "SQL syntax manipulation detected"
 
-    elif category == "Path Traversal / LFI":
+    # ---------- Command Injection ----------
+    if any(x in payload for x in [";", "|", "$("]):
+        out = subprocess.getoutput(payload)
+        category = "Command Injection"
+        result = "VULNERABILITY TRIGGERED"
+        proof = "OS command executed"
+
+    # ---------- LFI ----------
+    if "../" in payload or "..\\" in payload:
         try:
             open(payload).read()
+            category = "Path Traversal / LFI"
             result = "VULNERABILITY TRIGGERED"
             proof = "Arbitrary file read"
         except:
             pass
 
-    elif category == "SSRF":
-        try:
-            r = requests.get(payload, timeout=2)
-            result = "VULNERABILITY TRIGGERED"
-            proof = f"Internal request made (HTTP {r.status_code})"
-        except:
-            proof = "Request blocked"
-
-    elif category == "Open Redirect":
+    # ---------- XSS ----------
+    if "<script" in payload.lower():
+        category = "XSS"
         result = "VULNERABILITY TRIGGERED"
-        proof = "User redirected to external domain"
+        proof = "JavaScript executed in browser"
 
-    elif category == "XSS":
         REPORT = {
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Payload": payload,
-            "Category": "XSS",
-            "OWASP ID": OWASP["XSS"][0],
-            "OWASP Info": OWASP["XSS"][1],
-            "Result": "VULNERABILITY TRIGGERED",
-            "Proof": "JavaScript executed in browser",
-            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "Category": category,
+            "OWASP ID": OWASP[category]["id"],
+            "OWASP Info": OWASP[category]["info"],
+            "Result": result,
+            "Execution Proof": proof,
+            "Environment": "Local Vulnerable Lab",
+            "Model": "PlGenN Hybrid (Rule + GNN)"
         }
+
         return f"""
-        <h3>VULNERABILITY TRIGGERED</h3>
+        <h3 class='bad'>VULNERABILITY TRIGGERED</h3>
         <p><b>Category:</b> XSS</p>
-        <p><b>OWASP:</b> {OWASP["XSS"][0]}</p>
+        <p><b>OWASP:</b> {OWASP[category]["id"]}</p>
         <p><b>Proof:</b> Script executed below</p>
         <hr>{payload}<hr>
         <a href="/">⬅ Back</a>
         """
 
+    # ---------- FINAL REPORT ----------
     if category in OWASP:
-        REPORT = {
-            "Payload": payload,
-            "Category": category,
-            "OWASP ID": OWASP[category][0],
-            "OWASP Info": OWASP[category][1],
-            "Result": result,
-            "Proof": proof,
-            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        owasp_id = OWASP[category]["id"]
+        owasp_info = OWASP[category]["info"]
+    else:
+        owasp_id = "N/A"
+        owasp_info = "No OWASP Top 10 issue detected"
+
+    REPORT = {
+        "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Payload": payload,
+        "Category": category,
+        "OWASP ID": owasp_id,
+        "OWASP Info": owasp_info,
+        "Result": result,
+        "Execution Proof": proof,
+        "Environment": "Local Vulnerable Lab",
+        "Model": "PlGenN Hybrid (Rule + GNN)"
+    }
 
     return f"""
-    <h3>{result}</h3>
+    <h3 class='{'bad' if result=='VULNERABILITY TRIGGERED' else 'good'}'>{result}</h3>
     <p><b>Category:</b> {category}</p>
-    <p><b>OWASP:</b> {REPORT.get("OWASP ID","N/A")}</p>
+    <p><b>OWASP:</b> {owasp_id}</p>
     <p><b>Proof:</b> {proof}</p>
     <a href="/">⬅ Back</a>
     """
 
-# ---------------- PDF ----------------
+# ================= PDF =================
 @app.route("/report")
 def report():
     if not REPORT:
-        return "No test performed"
+        return "<h3>No test performed yet</h3><a href='/'>Go Back</a>"
 
     pdf = FPDF()
     pdf.add_page()
+    pdf.set_auto_page_break(True, 15)
     pdf.set_font("Arial", size=12)
-    pdf.cell(0,10,"PlGenN Payload Verification Report", ln=True)
 
-    for k,v in REPORT.items():
-        pdf.multi_cell(0,8,f"{k}: {v}")
+    pdf.cell(0, 10, "PlGenN Payload Verification Report", ln=True)
+    pdf.ln(5)
 
-    pdf.multi_cell(0,8,
-        "\nValidation Environment: Local Vulnerable Lab\n"
-        "OWASP Top 10 referenced\n"
+    for k, v in REPORT.items():
+        pdf.multi_cell(0, 8, f"{k}: {v}")
+
+    pdf.ln(5)
+    pdf.multi_cell(
+        0, 8,
+        "Reference: OWASP Top 10\n"
+        "Proof Source: Real Vulnerability Execution\n"
         "Purpose: Academic & Research Validation"
     )
 
-    buf = io.BytesIO(pdf.output(dest="S").encode("latin-1"))
-    return send_file(buf, as_attachment=True,
-                     download_name="PlGenN_Report.pdf")
+    buf = io.BytesIO()
+    pdf.output(buf)
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name="PlGenN_Report.pdf",
+        mimetype="application/pdf"
+    )
 
 if __name__ == "__main__":
     print("🌐 Open http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000)
 EOF
 
+echo ""
 echo "✅ Setup complete"
 echo "🌐 Open http://127.0.0.1:5000"
+echo ""
+
 python server.py

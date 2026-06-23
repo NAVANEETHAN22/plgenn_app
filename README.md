@@ -13,8 +13,7 @@ The framework focuses on generating diverse payloads while validating whether th
 Place the first screenshot here:
 
 ```markdown
-<img width="388" height="811" alt="1" src="https://github.com/user-attachments/assets/353e4d47-4c44-47d3-8e51-90eb44c1a5f7" />
-
+![Home Screen](<img width="388" height="811" alt="1" src="https://github.com/user-attachments/assets/cf8432bb-76d2-4b16-8e73-6269ad04a478" />)
 ```
 
 This screen provides access to:
@@ -28,8 +27,7 @@ This screen provides access to:
 Place the second screenshot here:
 
 ```markdown
-<img width="398" height="797" alt="2" src="https://github.com/user-attachments/assets/d2f1f524-6b3a-4af9-9e01-4c86d1e68796" />
-
+![Hybrid Generator](<img width="398" height="797" alt="2" src="https://github.com/user-attachments/assets/f42112cc-56fc-4e47-a0a0-e345632bedce" />)
 ```
 
 This interface allows users to:

@@ -10,11 +10,7 @@ The framework focuses on generating diverse payloads while validating whether th
 
 ### Home Screen
 
-Place the first screenshot here:
-
-```markdown
-![Home Screen](<img width="388" height="811" alt="1" src="https://github.com/user-attachments/assets/cf8432bb-76d2-4b16-8e73-6269ad04a478" />)
-```
+<img width="388" height="811" alt="1" src="https://github.com/user-attachments/assets/cf8432bb-76d2-4b16-8e73-6269ad04a478" />
 
 This screen provides access to:
 
@@ -24,11 +20,7 @@ This screen provides access to:
 
 ### Hybrid Payload Generator
 
-Place the second screenshot here:
-
-```markdown
-![Hybrid Generator](<img width="398" height="797" alt="2" src="https://github.com/user-attachments/assets/f42112cc-56fc-4e47-a0a0-e345632bedce" />)
-```
+<img width="398" height="797" alt="2" src="https://github.com/user-attachments/assets/f42112cc-56fc-4e47-a0a0-e345632bedce" />
 
 This interface allows users to:
 
